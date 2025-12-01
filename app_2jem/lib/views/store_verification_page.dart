@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/language_selector.dart';
-import 'package:app_2jem/views/register_count_page.dart';
+import 'package:app_2jem/view_models/job_view_model.dart'; // Added this
+import 'package:app_2jem/views/checklist_page.dart'; // Added this
 
 class StoreVerificationPage extends StatefulWidget {
   const StoreVerificationPage({super.key});
@@ -38,12 +39,13 @@ class _StoreVerificationPageState extends State<StoreVerificationPage> {
         final jobDocId = querySnapshot.docs.first.id;
 
         if (mounted) {
-          // Pass both storeId and jobDocId to the next page
+          // Initialize the job in the ViewModel (Corrected: only 2 args)
+          await Provider.of<JobViewModel>(context, listen: false)
+              .startNewJob(storeId, jobDocId);
+
+          // Navigate directly to the Checklist
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => RegisterCountPage(
-              storeId: storeId,
-              jobDocId: jobDocId,
-            ),
+            builder: (context) => const ChecklistPage(),
           ));
         }
       } else {
