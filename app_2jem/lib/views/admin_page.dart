@@ -5,6 +5,8 @@ import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/job_details_page.dart';
 import 'package:app_2jem/views/language_selector.dart';
 import 'package:app_2jem/views/user_management_page.dart';
+import 'package:app_2jem/views/material_management_page.dart'; // NEW
+import 'package:app_2jem/views/create_job_page.dart'; // NEW
 
 class PhotoEntry {
   final String label;
@@ -16,7 +18,7 @@ class StoreReport {
   final String storeId;
   final String date;
   final String technician;
-  final String status; // Added status
+  final String status;
   final Map<String, List<PhotoEntry>> categorizedPhotos;
 
   const StoreReport({
@@ -27,55 +29,25 @@ class StoreReport {
     required this.categorizedPhotos,
   });
 
+  // Updated to handle dynamic structure
   factory StoreReport.fromMap(Map<String, dynamic> data) {
     final Map<String, List<PhotoEntry>> photos = {};
 
-    if (data['registers'] != null) {
-      final List<dynamic> regs = data['registers'];
-      for (var r in regs) {
-        final regName = 'Register ${r['registerNumber']}';
+    if (data['items'] != null) {
+      for (var item in data['items']) {
+        final itemName = item['name'] ?? 'Unknown Item';
         final List<PhotoEntry> entries = [];
+        final Map<String, dynamic> itemPhotos = item['photos'] ?? {};
 
-        void addIfPresent(String? url, String label) {
-          if (url != null && url.isNotEmpty) {
+        itemPhotos.forEach((label, url) {
+          if (url != null && url.toString().isNotEmpty) {
             entries.add(PhotoEntry(label: label, url: url));
           }
-        }
-
-        addIfPresent(r['oldPinpadFront'], 'old_front');
-        addIfPresent(r['oldPinpadBack'], 'old_back');
-        addIfPresent(r['newPinpadFront'], 'new_front');
-        addIfPresent(r['newPinpadBack'], 'new_back');
-        addIfPresent(r['wholeSetNew'], 'whole_set');
-        addIfPresent(r['saleTestInvoice'], 'sale_invoice');
-        addIfPresent(r['refundTestInvoice'], 'refund_invoice');
+        });
 
         if (entries.isNotEmpty) {
-          photos[regName] = entries;
+          photos[itemName] = entries;
         }
-      }
-    }
-
-    if (data['backupPinpad'] != null) {
-      final b = data['backupPinpad'];
-      final List<PhotoEntry> backupEntries = [];
-
-      void addB(String? url, String label) {
-        if (url != null && url.isNotEmpty) {
-          backupEntries.add(PhotoEntry(label: label, url: url));
-        }
-      }
-
-      addB(b['backupPinpadFront'], 'backup_front');
-      addB(b['backupPinpadBack'], 'backup_back');
-      addB(b['backupPinpadSim'], 'backup_sim');
-      addB(b['manualButtonRegister'], 'backup_manual');
-      addB(b['transactionConfirmation'], 'backup_trans');
-      addB(b['saleInvoice'], 'backup_sale');
-      addB(b['refundInvoice'], 'backup_refund');
-
-      if (backupEntries.isNotEmpty) {
-        photos['Backup Pinpad'] = backupEntries;
       }
     }
 
@@ -83,11 +55,11 @@ class StoreReport {
     if (data['completionTime'] != null) {
       dateStr = data['completionTime'].toString().split('T')[0];
     } else if (data['startTime'] != null) {
-      dateStr = "Created: " + data['startTime'].toString().split('T')[0];
+      dateStr = "Open: " + data['startTime'].toString().split('T')[0];
     }
 
     return StoreReport(
-      storeId: data['storeId'] ?? 'Unknown Store',
+      storeId: data['storeId'] ?? 'Unknown',
       date: dateStr,
       technician: data['technicianEmail'] ?? 'Pending',
       status: data['status'] ?? 'unknown',
@@ -99,53 +71,6 @@ class StoreReport {
 class AdminPage extends StatelessWidget {
   const AdminPage({super.key});
 
-  // Function to open the dialog to create a new job
-  void _showCreateJobDialog(BuildContext context) {
-    final TextEditingController storeController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Create New Job'),
-          content: TextField(
-            controller: storeController,
-            decoration: const InputDecoration(
-              labelText: 'Store ID',
-              hintText: 'e.g., 12345-US',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final storeId = storeController.text.trim();
-                if (storeId.isNotEmpty) {
-                  // Create the job in Firestore
-                  await FirebaseFirestore.instance.collection('jobs').add({
-                    'storeId': storeId,
-                    'status': 'open', // Mark as open
-                    'startTime': DateTime.now().toIso8601String(),
-                    'technicianEmail': null, // No tech yet
-                  });
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Job created for store $storeId')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context);
@@ -154,11 +79,19 @@ class AdminPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(lang.translate('admin_dashboard')),
         actions: [
-          // NEW: Button to create a job
+          // NEW: Manage Materials Button
+          IconButton(
+            icon: const Icon(Icons.build_circle),
+            tooltip: 'Manage Materials',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const MaterialManagementPage())),
+          ),
+          // NEW: Create Job Button (Page)
           IconButton(
             icon: const Icon(Icons.add_business),
             tooltip: 'Create Job',
-            onPressed: () => _showCreateJobDialog(context),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const CreateJobPage())),
           ),
           const LanguageSelector(),
           const SizedBox(width: 8),
@@ -169,7 +102,6 @@ class AdminPage extends StatelessWidget {
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // Order by start time so newest created jobs show up top
         stream: FirebaseFirestore.instance
             .collection('jobs')
             .orderBy('startTime', descending: true)
@@ -188,8 +120,6 @@ class AdminPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               final report = StoreReport.fromMap(data);
-
-              // Visual cue for status
               final isOpen = report.status == 'open';
 
               return ListTile(
@@ -207,7 +137,6 @@ class AdminPage extends StatelessWidget {
                 onTap: isOpen
                     ? null
                     : () {
-                        // Can only view details if not open (or enable it to see empty state)
                         Navigator.of(context).push(MaterialPageRoute(
                             builder: (context) =>
                                 JobDetailsPage(report: report)));

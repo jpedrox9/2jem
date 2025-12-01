@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/providers/user_provider.dart';
 import 'package:app_2jem/view_models/job_view_model.dart';
@@ -30,16 +30,15 @@ class _JobSetupPageState extends State<JobSetupPage> {
     final int registerCount = int.tryParse(_registerCountController.text) ?? 0;
 
     try {
-      // 1. Verify if an OPEN job exists for this store
+      // 1. Check Firestore for an OPEN job for this store
       final querySnapshot = await FirebaseFirestore.instance
           .collection('jobs')
           .where('storeId', isEqualTo: storeId)
-          .where('status', isEqualTo: 'open') // Only find open jobs
+          .where('status', isEqualTo: 'open')
           .limit(1)
           .get();
 
       if (querySnapshot.docs.isEmpty) {
-        // No job found - Stop the tech
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -49,23 +48,20 @@ class _JobSetupPageState extends State<JobSetupPage> {
             ),
           );
         }
-        setState(() => _isLoading = false);
-        return;
-      }
+      } else {
+        // Job found!
+        final jobDocId = querySnapshot.docs.first.id;
 
-      // 2. Get the Job Document ID found in database
-      final jobDocId = querySnapshot.docs.first.id;
+        if (mounted) {
+          // 2. Start job in ViewModel passing the jobDocId (3 arguments)
+          Provider.of<JobViewModel>(context, listen: false)
+              .startNewJob(storeId, registerCount, jobDocId);
 
-      if (mounted) {
-        // 3. Start the job in ViewModel with the correct 3 arguments
-        // passing the existing jobDocId ensures we update it later
-        Provider.of<JobViewModel>(context, listen: false)
-            .startNewJob(storeId, registerCount, jobDocId);
-
-        // 4. Navigate
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => const ChecklistPage(),
-        ));
+          // 3. Navigate to checklist
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => const ChecklistPage(),
+          ));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -109,23 +105,18 @@ class _JobSetupPageState extends State<JobSetupPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.network(
-                  'https://placehold.co/150x150/006241/white?text=Tech+Portal',
-                  height: 120,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.handyman,
-                      size: 120,
-                      color: Color(0xFF1565C0)),
-                ),
+                // Using Icon as placeholder since we don't have network access to placehold.co for now
+                const Icon(Icons.store_mall_directory,
+                    size: 120, color: Color(0xFF1565C0)),
                 const SizedBox(height: 32),
 
                 // Store ID Field
                 TextFormField(
                   controller: _storeIdController,
                   decoration: InputDecoration(
-                    labelText: lang.translate('store_id_label'), // "Store ID"
+                    labelText: lang.translate('store_id_label'),
                     border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.storefront, color: Color(0xFF1565C0)),
+                    prefixIcon: const Icon(Icons.storefront),
                   ),
                   validator: (value) => value == null || value.isEmpty
                       ? lang.translate('required')
@@ -133,11 +124,11 @@ class _JobSetupPageState extends State<JobSetupPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Register Count Field (Technician Inputs This)
+                // Register Count Field
                 TextFormField(
                   controller: _registerCountController,
                   decoration: InputDecoration(
-                    labelText: lang.translate('count_label'), // "Count"
+                    labelText: lang.translate('count_label'),
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.point_of_sale),
                   ),

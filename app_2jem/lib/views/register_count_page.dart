@@ -8,11 +8,13 @@ import 'package:app_2jem/views/language_selector.dart';
 
 class RegisterCountPage extends StatefulWidget {
   final String storeId;
-  final String jobDocId; // Added this
+  final String jobDocId; // Added jobDocId
 
-  const RegisterCountPage(
-      {super.key, required this.storeId, required this.jobDocId // Added this
-      });
+  const RegisterCountPage({
+    super.key,
+    required this.storeId,
+    required this.jobDocId, // Required in constructor
+  });
 
   @override
   State<RegisterCountPage> createState() => _RegisterCountPageState();
@@ -27,7 +29,7 @@ class _RegisterCountPageState extends State<RegisterCountPage> {
       final registerCount = int.tryParse(_registerCountController.text) ?? 0;
 
       if (registerCount > 0) {
-        // Pass the existing document ID to the view model
+        // Now calling startNewJob with the correct 3 arguments
         Provider.of<JobViewModel>(context, listen: false)
             .startNewJob(widget.storeId, registerCount, widget.jobDocId);
 

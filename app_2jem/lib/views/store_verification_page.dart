@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/language_selector.dart';
 import 'package:app_2jem/views/register_count_page.dart';
@@ -25,8 +25,7 @@ class _StoreVerificationPageState extends State<StoreVerificationPage> {
     try {
       final storeId = _storeIdController.text.trim();
 
-      // --- FIRESTORE QUERY ---
-      // Look for a job with this storeId that is currently 'open'
+      // Check for an open job for this store
       final querySnapshot = await FirebaseFirestore.instance
           .collection('jobs')
           .where('storeId', isEqualTo: storeId)
@@ -35,19 +34,19 @@ class _StoreVerificationPageState extends State<StoreVerificationPage> {
           .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        // JOB FOUND!
+        // Job found! Get the doc ID.
         final jobDocId = querySnapshot.docs.first.id;
 
         if (mounted) {
+          // Pass both storeId and jobDocId to the next page
           Navigator.of(context).push(MaterialPageRoute(
             builder: (context) => RegisterCountPage(
               storeId: storeId,
-              jobDocId: jobDocId, // Pass the ID forward
+              jobDocId: jobDocId,
             ),
           ));
         }
       } else {
-        // JOB NOT FOUND
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -66,7 +65,9 @@ class _StoreVerificationPageState extends State<StoreVerificationPage> {
       }
     }
 
-    setState(() => _isVerifying = false);
+    if (mounted) {
+      setState(() => _isVerifying = false);
+    }
   }
 
   @override
@@ -94,7 +95,7 @@ class _StoreVerificationPageState extends State<StoreVerificationPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.storefront,
-                    size: 80, color: Color(0xFF006241)),
+                    size: 80, color: Color(0xFF1565C0)),
                 const SizedBox(height: 24),
                 Text(
                   lang.translate('enter_store'),

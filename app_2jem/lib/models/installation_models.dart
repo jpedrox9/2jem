@@ -1,121 +1,94 @@
-// Using 'XFile' from image_picker, but 'File' is also common.
-// For this model, we'll store the path as a String, which is safer
-// for serialization and state.
-typedef PhotoFile = String;
+/// Defines a "Type" of work (e.g., "Register Installation", "Router Swap")
+/// This is the template the Admin creates.
+class MaterialDefinition {
+  final String id;
+  final String name;
+  final List<String> requiredPhotos;
 
-/// Represents the data for a single register's pinpad swap.
-class RegisterChecklist {
-  final int registerNumber;
-  PhotoFile? oldPinpadFront;
-  PhotoFile? oldPinpadBack;
-  PhotoFile? newPinpadFront;
-  PhotoFile? newPinpadBack;
-  PhotoFile? wholeSetNew;
-  PhotoFile? saleTestInvoice;
-  PhotoFile? refundTestInvoice;
-
-  RegisterChecklist({required this.registerNumber});
-
-  // A helper to check if all photos for this register are complete
-  // Added trim() and isEmpty checks to prevent empty strings from counting as "done"
-  bool get isComplete {
-    bool valid(String? s) => s != null && s.trim().isNotEmpty;
-    return valid(oldPinpadFront) &&
-        valid(oldPinpadBack) &&
-        valid(newPinpadFront) &&
-        valid(newPinpadBack) &&
-        valid(wholeSetNew) &&
-        valid(saleTestInvoice) &&
-        valid(refundTestInvoice);
-  }
-
-  // Helper to get a list of all required photo titles
-  List<String> get photoRequirements => [
-        'Old Pinpad: Front',
-        'Old Pinpad: Back',
-        'New Pinpad: Front',
-        'New Pinpad: Back',
-        'Whole Set (New)',
-        'Sale Test Invoice',
-        'Refund Test Invoice',
-      ];
+  MaterialDefinition({
+    required this.id,
+    required this.name,
+    required this.requiredPhotos,
+  });
 
   Map<String, dynamic> toMap() {
     return {
-      'registerNumber': registerNumber,
-      'oldPinpadFront': oldPinpadFront,
-      'oldPinpadBack': oldPinpadBack,
-      'newPinpadFront': newPinpadFront,
-      'newPinpadBack': newPinpadBack,
-      'wholeSetNew': wholeSetNew,
-      'saleTestInvoice': saleTestInvoice,
-      'refundTestInvoice': refundTestInvoice,
+      'id': id,
+      'name': name,
+      'requiredPhotos': requiredPhotos,
     };
+  }
+
+  factory MaterialDefinition.fromMap(Map<String, dynamic> map) {
+    return MaterialDefinition(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      requiredPhotos: List<String>.from(map['requiredPhotos'] ?? []),
+    );
   }
 }
 
-/// Represents the data for the single backup pinpad.
-class BackupChecklist {
-  PhotoFile? backupPinpadFront;
-  PhotoFile? backupPinpadBack;
-  PhotoFile? backupPinpadSim;
-  PhotoFile? manualButtonRegister;
-  PhotoFile? transactionConfirmation;
-  PhotoFile? saleInvoice;
-  PhotoFile? refundInvoice;
+/// Represents a specific item in a job (e.g., "Register #1" based on "Register Installation" template)
+class JobItem {
+  final String id; // Unique ID for this specific item instance
+  final String name; // Display name (e.g., "Register 1")
+  final List<String> requiredPhotos; // Copied from template
+  final Map<String, String> photos; // Map: PhotoLabel -> Url/Path
 
-  BackupChecklist();
+  JobItem({
+    required this.id,
+    required this.name,
+    required this.requiredPhotos,
+    Map<String, String>? photos,
+  }) : photos = photos ?? {};
 
   bool get isComplete {
-    bool valid(String? s) => s != null && s.trim().isNotEmpty;
-    return valid(backupPinpadFront) &&
-        valid(backupPinpadBack) &&
-        valid(backupPinpadSim) &&
-        valid(manualButtonRegister) &&
-        valid(transactionConfirmation) &&
-        valid(saleInvoice) &&
-        valid(refundInvoice);
+    // Check if every required label exists in the photos map and is not empty
+    for (var label in requiredPhotos) {
+      if (!photos.containsKey(label) || photos[label]!.trim().isEmpty) {
+        return false;
+      }
+    }
+    return true;
   }
-
-  List<String> get photoRequirements => [
-        'Backup Pinpad: Front',
-        'Backup Pinpad: Back',
-        'Backup Pinpad: SIM Card',
-      ];
 
   Map<String, dynamic> toMap() {
     return {
-      'backupPinpadFront': backupPinpadFront,
-      'backupPinpadBack': backupPinpadBack,
-      'backupPinpadSim': backupPinpadSim,
-      'manualButtonRegister': manualButtonRegister,
-      'transactionConfirmation': transactionConfirmation,
-      'saleInvoice': saleInvoice,
-      'refundInvoice': refundInvoice,
+      'id': id,
+      'name': name,
+      'requiredPhotos': requiredPhotos,
+      'photos': photos,
     };
+  }
+
+  factory JobItem.fromMap(Map<String, dynamic> map) {
+    return JobItem(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      requiredPhotos: List<String>.from(map['requiredPhotos'] ?? []),
+      photos: Map<String, String>.from(map['photos'] ?? {}),
+    );
   }
 }
 
-/// The main data object for the entire installation job.
+/// The main Job object
 class InstallationJob {
   final String storeId;
   final String? technicianEmail;
   final DateTime startTime;
-  final List<RegisterChecklist> registers;
-  final BackupChecklist backupPinpad;
+  final List<JobItem> items; // Dynamic list of work items
 
-  InstallationJob(
-      {required this.storeId, required int registerCount, this.technicianEmail})
-      : registers = List.generate(registerCount,
-            (index) => RegisterChecklist(registerNumber: index + 1)),
-        backupPinpad = BackupChecklist(),
-        startTime = DateTime.now();
+  InstallationJob({
+    required this.storeId,
+    required this.items,
+    this.technicianEmail,
+    DateTime? startTime,
+  }) : startTime = startTime ?? DateTime.now();
 
   bool get isJobComplete {
-    // Check if all registers are complete AND the backup is complete.
-    if (!backupPinpad.isComplete) return false;
-    for (final register in registers) {
-      if (!register.isComplete) return false;
+    if (items.isEmpty) return false;
+    for (final item in items) {
+      if (!item.isComplete) return false;
     }
     return true;
   }
@@ -126,8 +99,7 @@ class InstallationJob {
       'technicianEmail': technicianEmail,
       'startTime': startTime.toIso8601String(),
       'completionTime': DateTime.now().toIso8601String(),
-      'registers': registers.map((r) => r.toMap()).toList(),
-      'backupPinpad': backupPinpad.toMap(),
+      'items': items.map((i) => i.toMap()).toList(),
     };
   }
 }
