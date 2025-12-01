@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app_2jem/models/installation_models.dart';
+import 'package:app_2jem/providers/language_provider.dart';
+import 'package:app_2jem/views/language_selector.dart';
 
 class CreateJobPage extends StatefulWidget {
   const CreateJobPage({super.key});
@@ -11,30 +14,25 @@ class CreateJobPage extends StatefulWidget {
 
 class _CreateJobPageState extends State<CreateJobPage> {
   final TextEditingController _storeController = TextEditingController();
-
-  // This list holds what we will put into the job
   final List<JobItem> _selectedItems = [];
 
   void _addItem(MaterialDefinition template) {
     setState(() {
-      // Generate a unique name (e.g., Register 1, Register 2)
       int count =
           _selectedItems.where((i) => i.name.startsWith(template.name)).length;
 
       _selectedItems.add(JobItem(
-        id: DateTime.now()
-            .microsecondsSinceEpoch
-            .toString(), // Simple unique ID
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
         name: "${template.name} ${count + 1}",
         requiredPhotos: template.requiredPhotos,
       ));
     });
   }
 
-  Future<void> _createJob() async {
+  Future<void> _createJob(LanguageProvider lang) async {
     if (_storeController.text.isEmpty || _selectedItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter Store ID and add items.')));
+          SnackBar(content: Text(lang.translate('enter_store_items'))));
       return;
     }
 
@@ -43,23 +41,30 @@ class _CreateJobPageState extends State<CreateJobPage> {
       'status': 'open',
       'startTime': DateTime.now().toIso8601String(),
       'technicianEmail': null,
-      // Save the list of items as Maps
       'items': _selectedItems.map((i) => i.toMap()).toList(),
     };
 
     await FirebaseFirestore.instance.collection('jobs').add(jobData);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Job Created Successfully')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(lang.translate('job_created'))));
       Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final lang = Provider.of<LanguageProvider>(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Create New Job')),
+      appBar: AppBar(
+        title: Text(lang.translate('create_new_job')),
+        actions: const [
+          LanguageSelector(),
+          SizedBox(width: 8),
+        ],
+      ),
       body: Row(
         children: [
           // --- LEFT: SELECTION PANEL ---
@@ -71,15 +76,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     controller: _storeController,
-                    decoration: const InputDecoration(
-                        labelText: 'Store ID', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: lang.translate('store_id_label'),
+                        border: const OutlineInputBorder()),
                   ),
                 ),
                 const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text("Available Materials (Tap to Add)",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(lang.translate('available_materials'),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
@@ -114,11 +120,11 @@ class _CreateJobPageState extends State<CreateJobPage> {
             flex: 3,
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text("Job Contents",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(lang.translate('job_contents'),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
                 Expanded(
                   child: ListView.builder(
@@ -131,7 +137,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         child: ListTile(
                           title: Text(item.name),
                           subtitle: Text(
-                              "Requires: ${item.requiredPhotos.join(', ')}"),
+                              "${lang.translate('requires')}: ${item.requiredPhotos.join(', ')}"),
                           trailing: IconButton(
                             icon: const Icon(Icons.remove_circle,
                                 color: Colors.red),
@@ -149,8 +155,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _createJob,
-                      child: const Text("CONFIRM & CREATE JOB"),
+                      onPressed: () => _createJob(lang),
+                      child: Text(lang.translate('confirm_create_job')),
                     ),
                   ),
                 ),

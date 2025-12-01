@@ -5,8 +5,8 @@ import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/job_details_page.dart';
 import 'package:app_2jem/views/language_selector.dart';
 import 'package:app_2jem/views/user_management_page.dart';
-import 'package:app_2jem/views/material_management_page.dart'; // NEW
-import 'package:app_2jem/views/create_job_page.dart'; // NEW
+import 'package:app_2jem/views/material_management_page.dart';
+import 'package:app_2jem/views/create_job_page.dart';
 
 class PhotoEntry {
   final String label;
@@ -29,7 +29,6 @@ class StoreReport {
     required this.categorizedPhotos,
   });
 
-  // Updated to handle dynamic structure
   factory StoreReport.fromMap(Map<String, dynamic> data) {
     final Map<String, List<PhotoEntry>> photos = {};
 
@@ -131,7 +130,7 @@ class AdminPage extends StatelessWidget {
                 title: Text(report.storeId,
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(isOpen
-                    ? 'Status: OPEN (Waiting for Tech)'
+                    ? lang.translate('status_open')
                     : '${lang.translate('technician')}: ${report.technician}\n${lang.translate('date')}: ${report.date}'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: isOpen

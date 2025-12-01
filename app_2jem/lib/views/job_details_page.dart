@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http; // Add this package
-import 'package:archive/archive.dart'; // Add this package
+import 'package:http/http.dart' as http;
+import 'package:archive/archive.dart';
 import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/admin_page.dart';
 import 'package:app_2jem/views/language_selector.dart';
@@ -15,13 +15,14 @@ class JobDetailsPage extends StatelessWidget {
   const JobDetailsPage({super.key, required this.report});
 
   // Function to download all photos as a single ZIP file
-  Future<void> _downloadAllPhotos(BuildContext context) async {
+  Future<void> _downloadAllPhotos(
+      BuildContext context, LanguageProvider lang) async {
     if (kIsWeb) {
       // Notify user process has started
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Generating ZIP file... This may take a few seconds.'),
-          duration: Duration(seconds: 4),
+        SnackBar(
+          content: Text(lang.translate('zip_generating')),
+          duration: const Duration(seconds: 4),
         ),
       );
 
@@ -63,7 +64,7 @@ class JobDetailsPage extends StatelessWidget {
         if (count == 0) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No photos found to zip.')),
+              SnackBar(content: Text(lang.translate('zip_no_photos'))),
             );
           }
           return;
@@ -89,8 +90,8 @@ class JobDetailsPage extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('ZIP file downloaded successfully!'),
+              SnackBar(
+                content: Text(lang.translate('zip_success')),
                 backgroundColor: Colors.green,
               ),
             );
@@ -101,7 +102,7 @@ class JobDetailsPage extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Error creating ZIP: $e'),
+                content: Text('${lang.translate('zip_error')} $e'),
                 backgroundColor: Colors.red),
           );
         }
@@ -109,8 +110,7 @@ class JobDetailsPage extends StatelessWidget {
     } else {
       // Mobile Placeholder
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('ZIP download is currently supported on Web only.')),
+        SnackBar(content: Text(lang.translate('zip_web_only'))),
       );
     }
   }
@@ -127,7 +127,7 @@ class JobDetailsPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.download),
             tooltip: 'Download All Photos (ZIP)',
-            onPressed: () => _downloadAllPhotos(context),
+            onPressed: () => _downloadAllPhotos(context, lang),
           ),
           const LanguageSelector(),
           const SizedBox(width: 8),
