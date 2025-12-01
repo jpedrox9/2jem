@@ -18,7 +18,6 @@ class JobSetupPage extends StatefulWidget {
 class _JobSetupPageState extends State<JobSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _storeIdController = TextEditingController();
-  final _registerCountController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> _startJob(LanguageProvider lang) async {
@@ -27,7 +26,6 @@ class _JobSetupPageState extends State<JobSetupPage> {
     setState(() => _isLoading = true);
 
     final storeId = _storeIdController.text.trim();
-    final int registerCount = int.tryParse(_registerCountController.text) ?? 0;
 
     try {
       // 1. Check Firestore for an OPEN job for this store
@@ -50,14 +48,20 @@ class _JobSetupPageState extends State<JobSetupPage> {
         }
       } else {
         // Job found!
-        final jobDocId = querySnapshot.docs.first.id;
+        final doc = querySnapshot.docs.first;
+        final jobDocId = doc.id;
+        final data = doc.data();
+
+        // 2. Fetch register count from DB (default to 1 if missing)
+        // This eliminates the need for the technician to guess or manually enter it
+        final int registerCount = (data['registerCount'] as int?) ?? 1;
 
         if (mounted) {
-          // 2. Start job in ViewModel passing the jobDocId (3 arguments)
+          // 3. Start job in ViewModel passing the fetched data
           Provider.of<JobViewModel>(context, listen: false)
               .startNewJob(storeId, registerCount, jobDocId);
 
-          // 3. Navigate to checklist
+          // 4. Navigate directly to checklist
           Navigator.of(context).push(MaterialPageRoute(
             builder: (context) => const ChecklistPage(),
           ));
@@ -105,7 +109,6 @@ class _JobSetupPageState extends State<JobSetupPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Using Icon as placeholder since we don't have network access to placehold.co for now
                 const Icon(Icons.store_mall_directory,
                     size: 120, color: Color(0xFF1565C0)),
                 const SizedBox(height: 32),
@@ -122,28 +125,6 @@ class _JobSetupPageState extends State<JobSetupPage> {
                       ? lang.translate('required')
                       : null,
                 ),
-                const SizedBox(height: 16),
-
-                // Register Count Field
-                TextFormField(
-                  controller: _registerCountController,
-                  decoration: InputDecoration(
-                    labelText: lang.translate('count_label'),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.point_of_sale),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return lang.translate('required');
-                    if (int.tryParse(value) == null || int.parse(value) <= 0) {
-                      return lang.translate('must_be_positive');
-                    }
-                    return null;
-                  },
-                ),
-
                 const SizedBox(height: 32),
 
                 // Start Button
