@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "256204824178",
+    "project_id": "app-2jem-v2",
+    "storage_bucket": "app-2jem-v2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256204824178:android:e0ee4c92a6160886a6aceb",
+        "android_client_info": {
+          "package_name": "com.example.app_2jem"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNeaL0hk1xFLIpvGsJ45-EbSM8V3uUsNg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
