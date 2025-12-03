@@ -1,12 +1,13 @@
-import 'package:flutter/foundation.dart'; // for kIsWeb
+import 'dart:io'; // Required for File writing on native
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:archive/archive.dart';
+import 'package:path_provider/path_provider.dart'; // Required for finding save paths
 import 'package:app_2jem/providers/language_provider.dart';
 import 'package:app_2jem/views/admin_page.dart';
 import 'package:app_2jem/views/language_selector.dart';
-// Add universal_html to pubspec.yaml for this to work cross-platform
 import 'package:universal_html/html.dart' as html;
 
 class JobDetailsPage extends StatelessWidget {
@@ -14,104 +15,125 @@ class JobDetailsPage extends StatelessWidget {
 
   const JobDetailsPage({super.key, required this.report});
 
-  // Function to download all photos as a single ZIP file
   Future<void> _downloadAllPhotos(
       BuildContext context, LanguageProvider lang) async {
-    if (kIsWeb) {
-      // Notify user process has started
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lang.translate('zip_generating')),
-          duration: const Duration(seconds: 4),
-        ),
-      );
+    // Notify user process has started
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(lang.translate('zip_generating')),
+        duration: const Duration(seconds: 4),
+      ),
+    );
 
-      try {
-        final archive = Archive();
-        int count = 0;
+    try {
+      // 1. GENERATE ZIP (Common for ALL platforms)
+      final archive = Archive();
+      int count = 0;
 
-        // Loop through all categories and photos
-        for (var entry in report.categorizedPhotos.entries) {
-          // Clean category name for filename (remove spaces/symbols)
-          final categoryName = entry.key
-              .replaceAll(RegExp(r'[^\w\s]+'), '')
-              .replaceAll(' ', '_');
+      for (var entry in report.categorizedPhotos.entries) {
+        final categoryName =
+            entry.key.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
 
-          for (var photo in entry.value) {
-            try {
-              // 1. Fetch image data from Firebase URL
-              // This works because we configured CORS earlier!
-              final response = await http.get(Uri.parse(photo.url));
-
-              if (response.statusCode == 200) {
-                // 2. Create a filename: Category_Label.jpg
-                final safeLabel =
-                    photo.label.replaceAll(RegExp(r'[^\w\s]+'), '_');
-                final filename = '${categoryName}_$safeLabel.jpg';
-
-                // 3. Add file to the archive
-                final file = ArchiveFile(
-                    filename, response.bodyBytes.length, response.bodyBytes);
-                archive.addFile(file);
-                count++;
-              }
-            } catch (e) {
-              debugPrint("Failed to download ${photo.url}: $e");
+        for (var photo in entry.value) {
+          try {
+            final response = await http.get(Uri.parse(photo.url));
+            if (response.statusCode == 200) {
+              final safeLabel =
+                  photo.label.replaceAll(RegExp(r'[^\w\s]+'), '_');
+              final filename = '${categoryName}_$safeLabel.jpg';
+              final file = ArchiveFile(
+                  filename, response.bodyBytes.length, response.bodyBytes);
+              archive.addFile(file);
+              count++;
             }
+          } catch (e) {
+            debugPrint("Failed to download ${photo.url}: $e");
           }
-        }
-
-        if (count == 0) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(lang.translate('zip_no_photos'))),
-            );
-          }
-          return;
-        }
-
-        // 4. Encode the archive to ZIP format
-        final encoder = ZipEncoder();
-        final zipBytes = encoder.encode(archive);
-
-        if (zipBytes != null) {
-          // 5. Create a Blob from the zip bytes
-          final blob = html.Blob([zipBytes], 'application/zip');
-
-          // 6. Create a download link and click it programmatically
-          final url = html.Url.createObjectUrlFromBlob(blob);
-          final anchor = html.AnchorElement(href: url)
-            ..setAttribute('download', '${report.storeId}_photos.zip')
-            ..click();
-
-          // Cleanup
-          html.Url.revokeObjectUrl(url);
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(lang.translate('zip_success')),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        debugPrint('Zip error: $e');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('${lang.translate('zip_error')} $e'),
-                backgroundColor: Colors.red),
-          );
         }
       }
-    } else {
-      // Mobile Placeholder
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(lang.translate('zip_web_only'))),
-      );
+
+      if (count == 0) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(lang.translate('zip_no_photos'))),
+          );
+        }
+        return;
+      }
+
+      final encoder = ZipEncoder();
+      final zipBytes = encoder.encode(archive);
+
+      if (zipBytes == null) {
+        throw Exception("Failed to encode ZIP");
+      }
+
+      // 2. SAVE FILE (Platform Specific)
+      if (kIsWeb) {
+        // WEB: Trigger browser download
+        final blob = html.Blob([zipBytes], 'application/zip');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', '${report.storeId}_photos.zip')
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // NATIVE: Determine correct Downloads folder
+        Directory? directory;
+
+        if (Platform.isAndroid) {
+          // Android specific: Go to the public Download folder
+          directory = Directory('/storage/emulated/0/Download');
+        } else {
+          // Windows/Linux/Mac: Use the OS standard Downloads folder
+          directory = await getDownloadsDirectory();
+        }
+
+        // Fallback: If downloads folder is null or doesn't exist (rare), use Documents
+        if (directory == null || !await directory.exists()) {
+          directory = await getApplicationDocumentsDirectory();
+        }
+
+        final String filePath =
+            '${directory.path}/${report.storeId}_photos.zip';
+        final File file = File(filePath);
+        await file.writeAsBytes(zipBytes);
+
+        if (context.mounted) {
+          // Show the path to the user
+          showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                    title: const Text("Download Complete"),
+                    content: Text("File saved to:\n$filePath"),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("OK"))
+                    ],
+                  ));
+        }
+      }
+
+      // Success SnackBar
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.translate('zip_success')),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Zip error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('${lang.translate('zip_error')} $e'),
+              backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -123,7 +145,6 @@ class JobDetailsPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(report.storeId),
         actions: [
-          // DOWNLOAD BUTTON
           IconButton(
             icon: const Icon(Icons.download),
             tooltip: 'Download All Photos (ZIP)',

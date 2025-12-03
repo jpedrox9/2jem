@@ -21,17 +21,14 @@ class JobViewModel extends ChangeNotifier {
   bool get isJobActive => _currentJob != null;
   bool get isUploading => _isUploading;
 
-  // CHANGED: Now loads the job items directly from Firestore
   Future<void> startNewJob(String storeId, String jobDocId) async {
     _currentJobDocId = jobDocId;
     final String techEmail = _auth.currentUser?.email ?? "Unknown Tech";
 
     try {
-      // Fetch the existing job structure defined by Admin
       final doc = await _firestore.collection('jobs').doc(jobDocId).get();
       final data = doc.data() as Map<String, dynamic>;
 
-      // Parse the dynamic items list
       List<JobItem> loadedItems = [];
       if (data['items'] != null) {
         loadedItems =
@@ -49,20 +46,24 @@ class JobViewModel extends ChangeNotifier {
     }
   }
 
-  // CHANGED: Now identifies photo by Item ID and Label (Strings), not Enum
   Future<void> capturePhoto(String itemId, String photoLabel) async {
     if (_currentJob == null) return;
 
     try {
+      // FIX: Windows does not support Camera, so we use Gallery (File Picker)
+      ImageSource source = ImageSource.camera;
+      if (!kIsWeb && Platform.isWindows) {
+        source = ImageSource.gallery;
+      }
+
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 70,
         maxWidth: 1024,
       );
 
       if (image == null) return;
 
-      // Find the item and update the specific photo
       final itemIndex = _currentJob!.items.indexWhere((i) => i.id == itemId);
       if (itemIndex != -1) {
         _currentJob!.items[itemIndex].photos[photoLabel] = image.path;
@@ -75,8 +76,8 @@ class JobViewModel extends ChangeNotifier {
 
   String? getPhotoPath(String itemId, String photoLabel) {
     if (_currentJob == null) return null;
-    final item = _currentJob!.items.firstWhere((i) => i.id == itemId,
-        orElse: () => _currentJob!.items[0]); // fallback unsafe but ok for now
+    final item = _currentJob!.items
+        .firstWhere((i) => i.id == itemId, orElse: () => _currentJob!.items[0]);
     return item.photos[photoLabel];
   }
 
@@ -126,10 +127,13 @@ class JobViewModel extends ChangeNotifier {
 
       try {
         final ref = _storage.ref().child('job_photos/$jobId/$name.jpg');
+
         if (kIsWeb) {
+          // For Web, we need to read as bytes
           await ref.putData(await XFile(localPath).readAsBytes(),
               SettableMetadata(contentType: 'image/jpeg'));
         } else {
+          // For Mobile/Desktop, putFile works best
           await ref.putFile(File(localPath));
         }
         return await ref.getDownloadURL();
@@ -139,16 +143,14 @@ class JobViewModel extends ChangeNotifier {
       }
     }
 
-    // Loop through dynamic items and photos
     for (var item in _currentJob!.items) {
       for (var label in item.requiredPhotos) {
         if (item.photos.containsKey(label)) {
-          // Generate a safe filename from item name and label
           final safeName = "${item.name}_$label"
               .replaceAll(RegExp(r'[^\w\s]+'), '')
               .replaceAll(' ', '_');
           final url = await uploadOne(item.photos[label], safeName);
-          item.photos[label] = url; // Update local map with URL
+          item.photos[label] = url;
         }
       }
     }
